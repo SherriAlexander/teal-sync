@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { Vault, VaultConfig } from './types.ts';
 
@@ -16,6 +16,9 @@ export function loadVaults(vaultsJsonPath: string): Vault[] {
 
 /** Absolute paths of the `.teal-sync.json` files listed in `vaults.json`. */
 export function configPaths(vaultsJsonPath: string): string[] {
+  if (!existsSync(vaultsJsonPath)) {
+    throw new Error(`${vaultsJsonPath} not found. Copy vaults.example.json to vaults.json and fill in your paths.`);
+  }
   const list = readJson(vaultsJsonPath) as { vaults?: unknown };
   if (!Array.isArray(list.vaults) || list.vaults.length === 0) {
     throw new Error(`${vaultsJsonPath}: expected { "vaults": ["/path/to/.teal-sync.json", …] }`);

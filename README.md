@@ -2,6 +2,16 @@
 
 Sync Teal job tracker CSV exports into the job-search Obsidian vaults. Also a Claude Code skill (`SKILL.md`, symlinked at `~/.claude/skills/teal-sync`).
 
+## Setup
+
+`vaults.json` holds machine-specific absolute paths and is gitignored. Create it from the template, then fill in the paths to each vault's `.teal-sync.json` and the folder Chrome downloads into:
+
+```bash
+cp vaults.example.json vaults.json
+```
+
+## Usage
+
 ```bash
 npm test            # node:test
 npm run typecheck

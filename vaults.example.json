@@ -1,0 +1,7 @@
+{
+  "vaults": [
+    "/absolute/path/to/job-search-mgr/manager-job-search/.teal-sync.json",
+    "/absolute/path/to/job-search-dev/ic-web-dev-search/.teal-sync.json"
+  ],
+  "downloadsDir": "/absolute/path/to/teal-sync/downloads"
+}

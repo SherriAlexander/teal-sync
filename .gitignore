@@ -3,3 +3,6 @@ node_modules/
 # Real Teal exports contain salary data. Only the scrubbed fixture belongs in git.
 *.csv
 !tests/fixtures/*.csv
+
+# Machine-specific paths. Copy vaults.example.json to vaults.json.
+vaults.json

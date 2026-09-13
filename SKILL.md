@@ -89,14 +89,17 @@ Use the `things-cli` skill for command details. `things.create`, `things.complet
 
 **Setup, once, before the first write:**
 - `things areas -j` must list `Homestuck`. The CLI can't create areas: if it's missing, ask the user to create an area named exactly `Homestuck` in Things, and skip the rest of this step until they have.
-- `things projects --area Homestuck -j` must list the vault's project (`Homestuck – M` or `Homestuck – Dev`, with an en dash). If missing, ask, then `things project add "<project>" --area "Homestuck"`.
+- `things projects --area Homestuck -j` must list the vault's project (`Homestuck – M` or `Homestuck – Dev`, with an en dash). If missing, ask, then `things project add "<project>" --area "Homestuck"`. It prints nothing and can take a few seconds to appear in `things projects`.
+- Things → Settings → General → **Enable Things URLs** must be on. `things edit` fails without it (`update: auth token is required`), so a misfiled to-do can't be fixed. The CLI reads the auth token from Things itself; never ask for it, pass it, or write it anywhere.
 
 **Create (`DUE` lines)**: ask per to-do (`Create check-in for <company>, due <due>?`).
 - Yes:
   ```bash
   things add "<title>" --project "<project>" --notes "<notes>" --when <due> --deadline <due> -j
   ```
-  Take the UUID from the output. If it doesn't include one, find it with `things search "<title>" -j` (open, in that project). Then `node scripts/update.ts things-id --note "<vaultDir>/<notePath>" --value <uuid>`.
+  `--project` takes the project **name** exactly as above. A project UUID is ignored and the to-do lands in the Inbox. A past `<due>` is fine: it shows in Today as overdue.
+
+  `add` prints nothing. Find the UUID with `things search "<title>" -j` (open). `search` and `show` don't report the project, so confirm it with `things list inbox -j` (it must **not** be there). Then `node scripts/update.ts things-id --note "<vaultDir>/<notePath>" --value <uuid>`.
 - No: `node scripts/update.ts things-id --note "<vaultDir>/<notePath>" --value none` so it isn't offered again.
 
 **Complete (`DONE` lines)**: no question needed. For each, `things show <thingsId> -j`. If its status is `open`, `things complete <thingsId>` and report it. If it's already completed or cancelled, or can't be found, do nothing.
