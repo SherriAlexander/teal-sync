@@ -1,1 +1,23 @@
 # teal-sync
+
+Sync Teal job tracker CSV exports into the job-search Obsidian vaults. Also a Claude Code skill (`SKILL.md`, symlinked at `~/.claude/skills/teal-sync`).
+
+```bash
+npm test            # node:test
+npm run typecheck
+
+# Sync every vault in vaults.json (files the CSV, mirrors loops, stamps lastSync)
+node scripts/import.ts --csv <job-tracker-*.csv> [--dry-run] [--force] [--today YYYY-MM-DD] [--json-out result.json]
+
+# Wait for a Chrome download
+node scripts/wait-download.ts --dir <downloads folder> --since <epoch ms> [--timeout 60]
+
+# Writes after the user answers
+node scripts/update.ts things-id --note <main note> --value <Things uuid | none>
+node scripts/update.ts resolve-proposal --config <.teal-sync.json> --teal-id <id> [--dismiss]
+node scripts/update.ts override --teal-id <id> --route manager|ic
+```
+
+`import.ts` exit codes: 0 ok, 1 error, 2 a vault hit the missing-jobs guard. Without `--json-out` it prints the `SyncResult` JSON (`scripts/lib/types.ts`); with it, the JSON goes to the file and stdout gets the text digest.
+
+Real exports contain salary data and are gitignored. Only `tests/fixtures/teal-export.csv` (scrubbed) is committed.

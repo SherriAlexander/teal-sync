@@ -71,6 +71,7 @@ export function makeConfig(route: VaultRoute, over: Partial<VaultConfig> = {}): 
     things: { area: 'Homestuck', project: route === 'manager' ? 'Homestuck – M' : 'Homestuck – Dev' },
     lastSync: null,
     pendingProposals: [],
+    dismissedProposals: [],
     ...over,
   };
 }

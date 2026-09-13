@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 // Sync a Teal "Download Data" CSV into every vault listed in vaults.json.
-// Prints the machine-readable SyncResult as JSON. Exit codes: 0 ok, 1 error, 2 a vault aborted (missing guard).
-import { readFileSync } from 'node:fs';
+// Mirrors Interview Loops, files the CSV into each root's exports folder, and prints the SyncResult (with digests) as JSON. Exit codes: 0 ok, 1 error, 2 a vault aborted (missing guard).
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadVaults } from './lib/config.ts';
+import { renderText } from './lib/digest.ts';
+import { fileExport } from './lib/exports.ts';
+import { finishAll } from './lib/finish.ts';
+import { formatLocalDate } from './lib/plan.ts';
 import { syncAll } from './lib/sync.ts';
 
-const USAGE = 'Usage: node scripts/import.ts --csv <teal-export.csv> [--vaults <vaults.json>] [--today YYYY-MM-DD] [--dry-run] [--force]';
+const USAGE = 'Usage: node scripts/import.ts --csv <teal-export.csv> [--vaults <vaults.json>] [--today YYYY-MM-DD] [--dry-run] [--force] [--json-out <file>]';
 const DEFAULT_VAULTS = fileURLToPath(new URL('../vaults.json', import.meta.url));
-
-function localDate(date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 function main(): number {
   let args;
@@ -22,9 +22,10 @@ function main(): number {
       options: {
         csv: { type: 'string' },
         vaults: { type: 'string', default: DEFAULT_VAULTS },
-        today: { type: 'string', default: localDate() },
+        today: { type: 'string', default: formatLocalDate(new Date()) },
         'dry-run': { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
+        'json-out': { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
       },
     }).values;
@@ -47,12 +48,24 @@ function main(): number {
   }
 
   try {
-    const result = syncAll(readFileSync(args.csv, 'utf8'), loadVaults(args.vaults), {
-      today: args.today,
-      force: args.force,
-      dryRun: args['dry-run'],
-    });
-    console.log(JSON.stringify(result, null, 2));
+    const vaults = loadVaults(args.vaults);
+    const options = { today: args.today, force: args.force, dryRun: args['dry-run'] };
+    const result = finishAll(syncAll(readFileSync(args.csv, 'utf8'), vaults, options), vaults, options);
+    if (!options.dryRun) {
+      const dirs = new Set(
+        vaults
+          .filter((vault) => !result.vaults.find((v) => v.vaultDir === vault.dir)?.aborted)
+          .map((vault) => resolve(vault.dir, vault.config.exportsDir)),
+      );
+      result.exports = [...dirs].map((dir) => fileExport(args.csv!, dir));
+    }
+    const json = JSON.stringify(result, null, 2);
+    if (args['json-out']) {
+      writeFileSync(args['json-out'], `${json}\n`);
+      console.log(renderText(result));
+    } else {
+      console.log(json);
+    }
     return result.vaults.some((vault) => vault.aborted) ? 2 : 0;
   } catch (error) {
     console.error(`teal-sync: ${(error as Error).message}`);

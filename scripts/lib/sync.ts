@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { dirname, join, posix } from 'node:path';
 import YAML from 'yaml';
 import { parseTealCsv } from './csv.ts';
-import { companyLink, jobFolderName, uniqueJobName } from './naming.ts';
+import { companyLink, jobFolderName, normalizeName, uniqueJobName } from './naming.ts';
 import { applyProps, ensureScaffold, joinNote, splitNote } from './note.ts';
 import { routeJob } from './route.ts';
 import type {
@@ -67,6 +67,8 @@ export function syncAll(csvText: string, vaults: Vault[], options: SyncOptions):
     counts,
     warnings,
     vaults: vaults.map((vault) => syncVault(vault, rows, routes, options)),
+    header: '',
+    exports: [],
   };
 }
 
@@ -95,6 +97,11 @@ function syncVault(vault: Vault, rows: TealRow[], routes: Map<string, Route>, op
     changes: [],
     jobs: [],
     warnings,
+    proposals: [],
+    flags: [],
+    things: { create: [], complete: [], offerComplete: [] },
+    digest: [],
+    summary: '',
     ...partial,
   });
 
@@ -332,11 +339,7 @@ function sameJob(job: ExistingJob, row: TealRow): boolean {
   const [folderCompany = '', ...folderRole] = job.name.split(' – ');
   const company = stringOrNull(job.props.company_name) ?? folderCompany;
   const role = stringOrNull(job.props.role) ?? folderRole.join(' – ');
-  return normalize(company) === normalize(row.companyName) && normalize(role) === normalize(row.role);
-}
-
-function normalize(value: string): string {
-  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return normalizeName(company) === normalizeName(row.companyName) && normalizeName(role) === normalizeName(row.role);
 }
 
 function stringOrNull(value: unknown): string | null {

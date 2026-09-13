@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadVaults } from '../scripts/lib/config.ts';
@@ -60,5 +60,39 @@ describe('import.ts CLI', () => {
     const proc = run([]);
     assert.equal(proc.status, 1);
     assert.match(proc.stderr, /--csv/);
+  });
+});
+
+describe('import.ts CLI filing', () => {
+  it('files the export into each root, stamps lastSync, and prints the digest', () => {
+    const { root, manager, vaultsJson } = setup();
+    const proc = run(['--csv', FIXTURE_PATH, '--vaults', vaultsJson, '--today', TODAY]);
+    assert.equal(proc.status, 0, proc.stderr);
+    const result = JSON.parse(proc.stdout);
+    assert.match(result.header, /^Teal sync: 10 jobs/);
+    assert.equal(result.exports.length, 2);
+    for (const side of ['mgr', 'dev']) assert.ok(existsSync(join(root, side, '.teal-exports', 'teal-export.csv')), side);
+    assert.equal(JSON.parse(readFileSync(join(manager.dir, '.teal-sync.json'), 'utf8')).lastSync, TODAY);
+  });
+
+  it('files nothing on a dry run', () => {
+    const { root, vaultsJson } = setup();
+    const proc = run(['--csv', FIXTURE_PATH, '--vaults', vaultsJson, '--today', TODAY, '--dry-run']);
+    assert.equal(proc.status, 0, proc.stderr);
+    assert.deepEqual(JSON.parse(proc.stdout).exports, []);
+    assert.ok(!existsSync(join(root, 'mgr', '.teal-exports')));
+  });
+});
+
+describe('import.ts --json-out', () => {
+  it('writes the JSON to a file and prints the text digest', () => {
+    const { root, vaultsJson } = setup();
+    const out = join(root, 'result.json');
+    const proc = run(['--csv', FIXTURE_PATH, '--vaults', vaultsJson, '--today', TODAY, '--dry-run', '--json-out', out]);
+    assert.equal(proc.status, 0, proc.stderr);
+    assert.match(proc.stdout, /^Teal sync: 10 jobs/);
+    assert.match(proc.stdout, /\n== manager-job-search ==\n/);
+    assert.match(proc.stdout, /summary: ic-web-dev-search: 7 new/);
+    assert.equal(JSON.parse(readFileSync(out, 'utf8')).exportRows, 10);
   });
 });

@@ -40,7 +40,9 @@ export interface VaultConfig extends RoutingRules {
   aliases: Record<string, string>;
   things: { area: string; project: string };
   lastSync: string | null;
-  pendingProposals: unknown[];
+  pendingProposals: Proposal[];
+  /** `<teal id>:<target loop status>` keys the user declined; never proposed again. */
+  dismissedProposals: string[];
 }
 
 export interface Vault {
@@ -102,6 +104,13 @@ export interface VaultResult {
   changes: Change[];
   jobs: JobSummary[];
   warnings: string[];
+  proposals: Proposal[];
+  flags: Flag[];
+  things: ThingsPlan;
+  /** Digest lines for this vault (full view, shown in its own root). */
+  digest: string[];
+  /** One-line summary (shown from the other root). */
+  summary: string;
 }
 
 export interface SyncResult {
@@ -109,4 +118,83 @@ export interface SyncResult {
   counts: Record<Route, number>;
   warnings: string[];
   vaults: VaultResult[];
+  /** `Teal sync: N jobs (…); X new, Y status changes` */
+  header: string;
+  exports: ExportFiling[];
+}
+
+/** One `### <Company>` entry from coaching_state.md Interview Loops (or Past Interview Loops). */
+export interface Loop {
+  heading: string;
+  /** Heading text before a role qualifier (` — Role`, ` (Role)`, `: Role`). */
+  company: string;
+  qualifier: string | null;
+  status: string | null;
+  rounds: string | null;
+  nextRound: string | null;
+  stories: string | null;
+  past: boolean;
+}
+
+/** A loop Status change suggested by Teal data, waiting for the user's yes. */
+export interface Proposal {
+  tealId: string;
+  company: string;
+  role: string;
+  notePath: string;
+  loop: string;
+  from: string;
+  to: string;
+  tealStatus: string;
+  proposedOn: string;
+}
+
+export type FlagType = 'no-loop' | 'teal-behind' | 'loop-mismatch' | 'closed-in-teal' | 'unmapped-status' | 'loop-ambiguous';
+
+export interface Flag {
+  type: FlagType;
+  tealId: string;
+  company: string;
+  role: string;
+  notePath: string;
+  tealStatus: string;
+  loopStatus: string | null;
+  /** Coach command to suggest, if any. */
+  suggest: string | null;
+}
+
+/** A Things3 check-in to-do to offer. Wording is already neutral (Homestuck rules). */
+export interface CheckIn {
+  tealId: string;
+  company: string;
+  notePath: string;
+  title: string;
+  notes: string;
+  /** YYYY-MM-DD, local time. */
+  due: string;
+  area: string;
+  project: string;
+}
+
+export interface ThingsRef {
+  tealId: string;
+  company: string;
+  notePath: string;
+  thingsId: string;
+  tealStatus: string;
+}
+
+export interface ThingsPlan {
+  /** `applied` jobs with no `things_id`: offer to create. */
+  create: CheckIn[];
+  /** Jobs past `applied` with a to-do: complete it if still open. */
+  complete: ThingsRef[];
+  /** Archived/missing jobs with a to-do: offer to complete it. */
+  offerComplete: ThingsRef[];
+}
+
+export interface ExportFiling {
+  dir: string;
+  filed: string | null;
+  pruned: string[];
 }

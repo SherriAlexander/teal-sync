@@ -26,6 +26,11 @@ export function uniqueJobName(base: string, tealId: string, taken: Set<string>):
   return free;
 }
 
+/** Lowercase letters and digits only, for matching company and role names loosely. */
+export function normalizeName(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
 export function companyLink(company: string, aliases: Record<string, string>): string {
   const target = Object.hasOwn(aliases, company) ? aliases[company] : `Companies/${sanitizeSegment(company)}`;
   return `[[${target}]]`;
