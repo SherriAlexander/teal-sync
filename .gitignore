@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+# Real Teal exports contain salary data. Only the scrubbed fixture belongs in git.
+*.csv
+!tests/fixtures/*.csv

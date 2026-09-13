@@ -1,0 +1,23 @@
+{
+  "name": "teal-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sync Teal job tracker CSV exports into Obsidian job-search vaults",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "sync": "node scripts/import.ts"
+  },
+  "dependencies": {
+    "csv-parse": "^7.0.2",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2"
+  }
+}
