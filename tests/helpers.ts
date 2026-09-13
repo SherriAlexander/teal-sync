@@ -68,7 +68,7 @@ export function makeConfig(route: VaultRoute, over: Partial<VaultConfig> = {}): 
     exportsDir: '../.teal-exports',
     overrides: {},
     aliases: {},
-    things: { area: 'Example', project: route === 'manager' ? 'Example – M' : 'Example – Dev' },
+    things: { area: 'Example', project: route === 'manager' ? 'Example – M' : 'Example – D' },
     lastSync: null,
     pendingProposals: [],
     dismissedProposals: [],

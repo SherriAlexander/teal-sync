@@ -102,7 +102,7 @@ describe('proposals and config', () => {
     assert.equal(config.pendingProposals[0].from, 'Researched');
     assert.equal(config.pendingProposals[0].to, 'Applied');
     assert.deepEqual(vaultOf(result, ic).proposals, config.pendingProposals);
-    assert.equal(config.things.project, 'Example – Dev', 'other keys survive');
+    assert.equal(config.things.project, 'Example – D', 'other keys survive');
 
     assert.equal(readConfig(manager).lastSync, TODAY);
     assert.deepEqual(readConfig(manager).pendingProposals, []);
