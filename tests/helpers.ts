@@ -68,7 +68,7 @@ export function makeConfig(route: VaultRoute, over: Partial<VaultConfig> = {}): 
     exportsDir: '../.teal-exports',
     overrides: {},
     aliases: {},
-    things: { area: 'Homestuck', project: route === 'manager' ? 'Homestuck – M' : 'Homestuck – Dev' },
+    things: { area: 'Example', project: route === 'manager' ? 'Example – M' : 'Example – Dev' },
     lastSync: null,
     pendingProposals: [],
     dismissedProposals: [],

@@ -1,6 +1,6 @@
 ---
 name: teal-sync
-description: Sync the Teal job tracker into the job-search Obsidian vaults (manager-job-search and ic-web-dev-search). Downloads Teal's CSV through Claude in Chrome, updates job folders in both vaults, mirrors Interview Loop status, prints a "what's next" digest, and handles loop Status proposals, vault routing questions, and Homestuck check-in to-dos in Things3. Use when the user says "sync teal", "teal sync", "/teal-sync", or hands over a Teal job-tracker CSV.
+description: Sync the Teal job tracker into the job-search Obsidian vaults (manager-job-search and ic-web-dev-search). Downloads Teal's CSV through Claude in Chrome, updates job folders in both vaults, mirrors Interview Loop status, prints a "what's next" digest, and handles loop Status proposals, vault routing questions, and check-in to-dos in Things3. Use when the user says "sync teal", "teal sync", "/teal-sync", or hands over a Teal job-tracker CSV.
 ---
 
 # teal-sync
@@ -88,8 +88,9 @@ Proposals for the other vault stay queued in its `.teal-sync.json`; its `CLAUDE.
 Use the `things-cli` skill for command details. `things.create`, `things.complete`, and `things.offerComplete` in the JSON drive everything.
 
 **Setup, once, before the first write:**
-- `things areas -j` must list `Homestuck`. The CLI can't create areas: if it's missing, ask the user to create an area named exactly `Homestuck` in Things, and skip the rest of this step until they have.
-- `things projects --area Homestuck -j` must list the vault's project (`Homestuck – M` or `Homestuck – Dev`, with an en dash). If missing, ask, then `things project add "<project>" --area "Homestuck"`. It prints nothing and can take a few seconds to appear in `things projects`.
+Area and project names come from the vault's `.teal-sync.json` (`things.area`, `things.project`; also in each `things.create` entry). Never write them into this repo.
+- `things areas -j` must list `<area>`. The CLI can't create areas: if it's missing, ask the user to create an area with exactly that name in Things, and skip the rest of this step until they have.
+- `things projects --area "<area>" -j` must list `<project>` (match exactly, including any en dash). If missing, ask, then `things project add "<project>" --area "<area>"`. It prints nothing and can take a few seconds to appear in `things projects`.
 - Things → Settings → General → **Enable Things URLs** must be on. `things edit` fails without it (`update: auth token is required`), so a misfiled to-do can't be fixed. The CLI reads the auth token from Things itself; never ask for it, pass it, or write it anywhere.
 
 **Create (`DUE` lines)**: ask per to-do (`Create check-in for <company>, due <due>?`).

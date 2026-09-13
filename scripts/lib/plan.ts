@@ -91,7 +91,7 @@ export function loopAction(
   };
 }
 
-/** Check-in to-dos to create, complete, or offer to complete. Titles and notes follow the Homestuck wording rules. */
+/** Check-in to-dos to create, complete, or offer to complete. Titles and notes follow the neutral wording rules. */
 export function thingsPlan(jobs: JobSummary[], config: VaultConfig, today: string): ThingsPlan {
   const plan: ThingsPlan = { create: [], complete: [], offerComplete: [] };
   for (const job of jobs) {

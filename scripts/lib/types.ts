@@ -163,7 +163,7 @@ export interface Flag {
   suggest: string | null;
 }
 
-/** A Things3 check-in to-do to offer. Wording is already neutral (Homestuck rules). */
+/** A Things3 check-in to-do to offer. Wording is already neutral. */
 export interface CheckIn {
   tealId: string;
   company: string;

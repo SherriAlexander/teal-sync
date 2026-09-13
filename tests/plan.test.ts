@@ -134,8 +134,8 @@ describe('thingsPlan', () => {
       title: 'Check in: Globex',
       notes: obsidianUrl('manager-job-search', NOTE),
       due: '2026-09-14',
-      area: 'Homestuck',
-      project: 'Homestuck – M',
+      area: 'Example',
+      project: 'Example – M',
     }]);
     assert.deepEqual(plan.complete, []);
     assert.deepEqual(plan.offerComplete, []);
