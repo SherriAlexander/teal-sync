@@ -103,11 +103,10 @@ describe('feedback queue and config', () => {
     assert.ok(!('pendingProposals' in config) && !('dismissedProposals' in config));
     assert.equal(config.things.project, 'Example – D', 'other keys survive');
     assert.deepEqual(vaultOf(result, ic).feedback, config.pendingFeedback);
-    assert.equal(vaultOf(result, ic).feedbackMessage, "I'm interested in a new job description: Acme – Staff Frontend Engineer (https://example.com/jobs/1)");
 
     assert.equal(readConfig(manager).lastSync, TODAY);
     assert.deepEqual(readConfig(manager).pendingFeedback, []);
-    assert.equal(vaultOf(result, manager).feedbackMessage, null);
+    assert.deepEqual(vaultOf(result, manager).feedback, []);
   });
 
   it('keeps queued feedback across syncs and merges moves of the same job', () => {

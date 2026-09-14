@@ -106,8 +106,6 @@ export interface VaultResult {
   warnings: string[];
   /** This vault's feedback queue after this sync (earlier unsent items included). */
   feedback: FeedbackItem[];
-  /** `feedback` as one message for the coach, or null when nothing is queued. */
-  feedbackMessage: string | null;
   things: ThingsPlan;
   /** Digest lines for this vault (full view, shown in its own root). */
   digest: string[];

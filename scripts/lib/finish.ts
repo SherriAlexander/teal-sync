@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { updateConfigFile } from './config.ts';
 import { syncHeader, vaultDigest, vaultSummary } from './digest.ts';
 import { findLoop, loopLine, parseLoops, upsertLoopBlock } from './loops.ts';
-import { feedbackItems, feedbackMessage, mergeFeedback } from './feedback.ts';
+import { feedbackItems, mergeFeedback } from './feedback.ts';
 import { applyProps, joinNote, splitNote } from './note.ts';
 import { thingsPlan } from './plan.ts';
 import type { FeedbackItem, Loop, SyncOptions, SyncResult, Vault, VaultResult } from './types.ts';
@@ -57,7 +57,6 @@ function finishVault(input: VaultResult, vault: Vault, options: SyncOptions): Va
     jobs,
     warnings,
     feedback,
-    feedbackMessage: feedbackMessage(feedback),
     things: thingsPlan(jobs, vault.config, options.today),
   };
   return { ...partial, digest: vaultDigest(partial), summary: vaultSummary(partial) };

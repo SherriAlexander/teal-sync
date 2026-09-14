@@ -1,6 +1,6 @@
 ---
 name: teal-sync
-description: Sync the Teal job tracker into the job-search Obsidian vaults (manager-job-search and ic-web-dev-search). Downloads Teal's CSV through Claude in Chrome, updates job folders in both vaults, mirrors Interview Loop status, prints a "what's next" digest, tells the coach what changed in Teal through its `feedback` command, and handles vault routing questions and check-in to-dos in Things3. Use when the user says "sync teal", "teal sync", "/teal-sync", or hands over a Teal job-tracker CSV.
+description: Sync the Teal job tracker into the job-search Obsidian vaults (manager-job-search and ic-web-dev-search). Downloads Teal's CSV through Claude in Chrome, updates job folders in both vaults, mirrors Interview Loop status, prints a "what's next" digest, queues Teal changes for the coach, and handles vault routing questions and check-in to-dos in Things3. Use when the user says "sync teal", "teal sync", "/teal-sync", or hands over a Teal job-tracker CSV.
 ---
 
 # teal-sync
@@ -8,8 +8,8 @@ description: Sync the Teal job tracker into the job-search Obsidian vaults (mana
 Repo (this skill's folder): `~/Documents/Projects/teal-sync`. Run every script from there with `node scripts/<name>.ts` (Node 24 runs TypeScript directly).
 
 **Hard rules**
-- Sync runs one coach command: `feedback`, in the current root, with the message the script builds. It runs no other coach command and never edits `coaching_state.md` itself; `feedback` decides what changes there.
-- Automatic: job folders, main-note frontmatter, `DERIVED:loop` blocks, `.teal-exports/` filing, `lastSync`, the `pendingFeedback` queue, running `feedback`, completing a check-in to-do once its job has moved past `applied`.
+- Sync runs no coach commands and never writes coach files (`coaching_state.md`, `storybank.md`, `coaching_state_archive.md`, `COACH:` blocks in vault notes). Teal changes reach the coach only through the `pendingFeedback` queue, which the coach handles at session start (the root's `CLAUDE.local.md`).
+- Automatic: job folders, main-note frontmatter, `DERIVED:loop` blocks, `.teal-exports/` filing, `lastSync`, the `pendingFeedback` queue, completing a check-in to-do once its job has moved past `applied`.
 - Needs the user's yes: routing overrides, creating Things projects or to-dos, completing to-dos of archived/missing jobs.
 - Browser: Claude in Chrome, **"Claude Chrome" profile only**.
 - Things3 is visible to the user's employer. Use only the title, notes, area, and project strings the script outputs. No tags, checklists, or extra words. Never write job, interview, apply, application, recruiter, hiring, offer, salary, or role titles to Things.
@@ -22,7 +22,7 @@ Current root = the search root that contains the working directory:
 |---|---|---|
 | `~/Documents/Projects/job-search-mgr` | `manager-job-search` | `job-search-mgr/manager-job-search/.teal-sync.json` |
 | `~/Documents/Projects/job-search-dev` | `ic-web-dev-search` | `job-search-dev/ic-web-dev-search/.teal-sync.json` |
-| anywhere else | none | show both digests in full; skip steps 4–6 and tell the user to open a root to act on them |
+| anywhere else | none | show both digests in full; skip steps 4–5 and tell the user to open a root to act on them |
 
 ## 1. Get the CSV
 
@@ -62,11 +62,11 @@ Print, in this order:
 3. The current vault's digest lines as they are, then its `WARN` lines.
 4. The other vault's `summary:` line, followed by `Open <other root> to act on them.` when it has anything.
 
-Digest line tags: `NEW` / `LINK` (new or coach-created folder linked), `MOVE` (Teal status change), `GONE` (archived or missing in Teal), `ROUTE` / `RENAME`, `FEED` (queued for the coach's `feedback`), `ASK` (which vault?), `DUE` (check-in to-do to offer), `DONE` (to-do being completed), `TODO` (to-do to offer completing).
+Digest line tags: `NEW` / `LINK` (new or coach-created folder linked), `MOVE` (Teal status change), `GONE` (archived or missing in Teal), `ROUTE` / `RENAME`, `FEED` (queued for the coach), `ASK` (which vault?), `DUE` (check-in to-do to offer), `DONE` (to-do being completed), `TODO` (to-do to offer completing).
 
 Also check the JSON for Teal `statusName` values other than bookmarked / applying / applied / interviewing / negotiating / accepted (they show as warnings). Mention any new ones so the handoff's unknowns list can be updated.
 
-## 4. Routing and feedback for the current vault
+## 4. Routing for the current vault
 
 Work from the current vault's entry in the JSON (`vaults[]` where `vaultDir` is the current vault). Batch related yes/no questions into one prompt where it reads cleanly.
 
@@ -74,15 +74,7 @@ Work from the current vault's entry in the JSON (`vaults[]` where `vaultDir` is 
 ```bash
 node scripts/update.ts override --teal-id <id> --route manager|ic
 ```
-This writes the override into both vaults' configs. Re-run step 2's command with the filed CSV (`<root>/.teal-exports/<csv name>`) so the job moves out of `_Inbox` and the other vault's copy is removed.
-
-**Feedback (`FEED` lines, `feedbackMessage`)**: after routing, so jobs routed out of `_Inbox` are included. The queue holds new jobs at any status and every Teal status change, archiving included. Jobs missing from the export and jobs still waiting for a route are left out.
-1. If the current vault's `feedbackMessage` is null, skip this.
-2. Run the coach's `feedback` command with `feedbackMessage` as the user's input, as if they had typed it (the coach's `references/commands/feedback.md`). Don't ask first. Its follow-up questions go to the user.
-3. Once `feedback` has made its state updates: `node scripts/update.ts clear-feedback --config <current config>`.
-4. Re-run step 2's command with the filed CSV to refresh `loop_status` and `DERIVED:loop`. It is idempotent.
-
-The other vault's changes stay in its `pendingFeedback`; that root's `CLAUDE.local.md` sends them to its coach at the next session start. Say how many are waiting there.
+This writes the override into both vaults' configs. Re-run step 2's command with the filed CSV (`<root>/.teal-exports/<csv name>`) so the job moves out of `_Inbox`, the other vault's copy is removed, and the job joins the right vault's `pendingFeedback` (jobs waiting for a route are left out of the queue).
 
 ## 5. Things3 (current vault only)
 
@@ -110,4 +102,9 @@ Area and project names come from the vault's `.teal-sync.json` (`things.area`, `
 
 ## 6. Wrap up
 
-End with a short recap: what was written automatically, what the user confirmed, what `feedback` recorded, and what is still waiting (other vault's queued feedback and to-dos). Don't run any coach command other than `feedback`.
+End with a short recap: what was written automatically, what the user confirmed, and what is still waiting (the other vault's to-dos).
+
+Then hand the queue to the coach. Counts are `feedback.length` per vault in the JSON (after any routing re-run). Never run `feedback` or clear the queue yourself.
+- Current vault has items: end with `N Teal updates queued for the coach. Type /clear, then any message, to hand them over.`
+- Other vault has items: `M Teal updates queued in <other vault>. Open <other root> and send any message to hand them over.`
+- No current vault: one line per vault with items, `N Teal updates queued in <vault>. Open <root> and send any message to hand them over.` (`/clear` here won't load the coach.)

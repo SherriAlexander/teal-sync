@@ -98,7 +98,6 @@ function syncVault(vault: Vault, rows: TealRow[], routes: Map<string, Route>, op
     jobs: [],
     warnings,
     feedback: [],
-    feedbackMessage: null,
     things: { create: [], complete: [], offerComplete: [] },
     digest: [],
     summary: '',
