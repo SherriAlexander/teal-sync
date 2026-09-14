@@ -9,7 +9,7 @@ import type {
   Change, JobSummary, Route, SyncOptions, SyncResult, TealRow, Vault, VaultResult, VaultRoute,
 } from './types.ts';
 
-const KNOWN_STATUSES = new Set(['bookmarked', 'applying', 'applied', 'interviewing']);
+const KNOWN_STATUSES = new Set(['bookmarked', 'applying', 'applied', 'interviewing', 'negotiating', 'accepted']);
 const PRE_APPLICATION_STATUSES = new Set(['bookmarked', 'applying']);
 /** Written empty at creation, then owned by the teal-sync skill (loop mirror, Things3). */
 const SKILL_OWNED_KEYS = ['loop_status', 'things_id'];
@@ -97,8 +97,8 @@ function syncVault(vault: Vault, rows: TealRow[], routes: Map<string, Route>, op
     changes: [],
     jobs: [],
     warnings,
-    proposals: [],
-    flags: [],
+    feedback: [],
+    feedbackMessage: null,
     things: { create: [], complete: [], offerComplete: [] },
     digest: [],
     summary: '',
@@ -328,6 +328,7 @@ function summarize(props: Record<string, unknown>, notePath: string): JobSummary
     tealStatus: stringOrNull(props.teal_status) ?? '',
     loopStatus: stringOrNull(props.loop_status),
     notePath,
+    url: stringOrNull(props.url),
     appliedAt: stringOrNull(props.applied_at),
     followUpAt: stringOrNull(props.follow_up_at),
     thingsId: stringOrNull(props.things_id),

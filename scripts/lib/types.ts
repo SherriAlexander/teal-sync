@@ -40,9 +40,8 @@ export interface VaultConfig extends RoutingRules {
   aliases: Record<string, string>;
   things: { area: string; project: string };
   lastSync: string | null;
-  pendingProposals: Proposal[];
-  /** `<teal id>:<target loop status>` keys the user declined; never proposed again. */
-  dismissedProposals: string[];
+  /** Teal changes waiting for this root's coach `feedback` command; cleared after it runs. */
+  pendingFeedback: FeedbackItem[];
 }
 
 export interface Vault {
@@ -90,6 +89,7 @@ export interface JobSummary {
   tealStatus: string;
   loopStatus: string | null;
   notePath: string;
+  url: string | null;
   appliedAt: string | null;
   followUpAt: string | null;
   thingsId: string | null;
@@ -104,8 +104,10 @@ export interface VaultResult {
   changes: Change[];
   jobs: JobSummary[];
   warnings: string[];
-  proposals: Proposal[];
-  flags: Flag[];
+  /** This vault's feedback queue after this sync (earlier unsent items included). */
+  feedback: FeedbackItem[];
+  /** `feedback` as one message for the coach, or null when nothing is queued. */
+  feedbackMessage: string | null;
   things: ThingsPlan;
   /** Digest lines for this vault (full view, shown in its own root). */
   digest: string[];
@@ -136,31 +138,17 @@ export interface Loop {
   past: boolean;
 }
 
-/** A loop Status change suggested by Teal data, waiting for the user's yes. */
-export interface Proposal {
+/** A Teal change to tell the coach about through its `feedback` command. */
+export interface FeedbackItem {
   tealId: string;
   company: string;
   role: string;
-  notePath: string;
-  loop: string;
-  from: string;
+  url: string | null;
+  /** Teal status before the change; null for a job new to this vault. */
+  from: string | null;
   to: string;
-  tealStatus: string;
-  proposedOn: string;
-}
-
-export type FlagType = 'no-loop' | 'teal-behind' | 'loop-mismatch' | 'closed-in-teal' | 'unmapped-status' | 'loop-ambiguous';
-
-export interface Flag {
-  type: FlagType;
-  tealId: string;
-  company: string;
-  role: string;
-  notePath: string;
-  tealStatus: string;
-  loopStatus: string | null;
-  /** Coach command to suggest, if any. */
-  suggest: string | null;
+  /** YYYY-MM-DD of the sync that first saw the change. */
+  seenOn: string;
 }
 
 /** A Things3 check-in to-do to offer. Wording is already neutral. */

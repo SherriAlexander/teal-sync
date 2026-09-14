@@ -22,9 +22,10 @@ node scripts/import.ts --csv <job-tracker-*.csv> [--dry-run] [--force] [--today 
 # Wait for a Chrome download
 node scripts/wait-download.ts --dir <downloads folder> --since <epoch ms> [--timeout 60]
 
-# Writes after the user answers
+# Writes after the user answers, and the feedback queue
 node scripts/update.ts things-id --note <main note> --value <Things uuid | none>
-node scripts/update.ts resolve-proposal --config <.teal-sync.json> --teal-id <id> [--dismiss]
+node scripts/update.ts feedback-message --config <.teal-sync.json>   # prints the queued message for the coach's feedback
+node scripts/update.ts clear-feedback --config <.teal-sync.json>
 node scripts/update.ts override --teal-id <id> --route manager|ic
 ```
 

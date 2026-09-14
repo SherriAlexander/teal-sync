@@ -1,95 +1,10 @@
-import type {
-  CheckIn, Flag, FlagType, JobSummary, Loop, Proposal, ThingsPlan, ThingsRef, VaultConfig,
-} from './types.ts';
+import type { CheckIn, JobSummary, ThingsPlan, ThingsRef, VaultConfig } from './types.ts';
 
-const STAGES = ['Decoded', 'Researched', 'Applied', 'Interviewing', 'Offer', 'Closed'] as const;
-type Stage = (typeof STAGES)[number];
-
-/** The loop Status a Teal status implies while Teal still owns the job (before interviews). */
-const TEAL_TO_STAGE: Record<string, Stage> = {
-  bookmarked: 'Researched',
-  applying: 'Applied',
-  applied: 'Applied',
-  interviewing: 'Interviewing',
-};
-const PRE_INTERVIEW = new Set(['bookmarked', 'applying', 'applied']);
 const GONE = new Set(['archived', 'missing']);
 const CHECK_IN_DAYS = 7;
 
 /** `things_id` value recording that the user declined a check-in to-do. */
 export const DECLINED_THINGS_ID = 'none';
-
-export function loopStage(status: string | null): Stage | null {
-  const word = status?.trim().split(/[^A-Za-z]/)[0].toLowerCase();
-  if (!word) return null;
-  if (word === 'rejected' || word === 'withdrawn') return 'Closed';
-  return STAGES.find((stage) => stage.toLowerCase() === word) ?? null;
-}
-
-export interface LoopActionOptions {
-  today: string;
-  /** `<teal id>:<target Status>` keys the user declined. */
-  dismissed: readonly string[];
-  /** Several loops match the company and the role doesn't pick one. */
-  ambiguous?: boolean;
-}
-
-/** Compare a job's Teal status with its loop: a Status proposal (Teal owns), a flag (coach owns), or nothing. */
-export function loopAction(
-  job: JobSummary,
-  loop: Loop | null,
-  options: LoopActionOptions,
-): { proposal: Proposal | null; flag: Flag | null } {
-  const none = { proposal: null, flag: null };
-  const flag = (type: FlagType, suggest: string | null = null) => ({
-    proposal: null,
-    flag: {
-      type,
-      tealId: job.tealId,
-      company: job.company,
-      role: job.role,
-      notePath: job.notePath,
-      tealStatus: job.tealStatus,
-      loopStatus: loop?.status ?? null,
-      suggest,
-    },
-  });
-  const teal = job.tealStatus;
-  const feedback = `feedback ${job.company}`;
-
-  if (!loop) {
-    if (options.ambiguous) return flag('loop-ambiguous');
-    return teal === 'interviewing' ? flag('no-loop', `prep ${job.company}`) : none;
-  }
-
-  const stage = loopStage(loop.status);
-  if (stage === null || stage === 'Closed') return none;
-  if (stage === 'Interviewing' || stage === 'Offer') {
-    if (PRE_INTERVIEW.has(teal)) return flag('teal-behind');
-    if (teal === 'interviewing' || (stage === 'Offer' && !GONE.has(teal))) return none;
-    return flag('loop-mismatch', feedback);
-  }
-
-  const target = Object.hasOwn(TEAL_TO_STAGE, teal) ? TEAL_TO_STAGE[teal] : null;
-  if (target === null) return GONE.has(teal) ? flag('closed-in-teal', feedback) : flag('unmapped-status');
-  if (target === stage || (target === 'Researched' && stage === 'Decoded')) return none;
-  if (options.dismissed.includes(`${job.tealId}:${target}`)) return none;
-
-  return {
-    proposal: {
-      tealId: job.tealId,
-      company: job.company,
-      role: job.role,
-      notePath: job.notePath,
-      loop: loop.heading,
-      from: loop.status ?? '',
-      to: target,
-      tealStatus: teal,
-      proposedOn: options.today,
-    },
-    flag: null,
-  };
-}
 
 /** Check-in to-dos to create, complete, or offer to complete. Titles and notes follow the neutral wording rules. */
 export function thingsPlan(jobs: JobSummary[], config: VaultConfig, today: string): ThingsPlan {

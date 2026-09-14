@@ -3,13 +3,14 @@ import { join, resolve } from 'node:path';
 import { updateConfigFile } from './config.ts';
 import { syncHeader, vaultDigest, vaultSummary } from './digest.ts';
 import { findLoop, loopLine, parseLoops, upsertLoopBlock } from './loops.ts';
+import { feedbackItems, feedbackMessage, mergeFeedback } from './feedback.ts';
 import { applyProps, joinNote, splitNote } from './note.ts';
-import { loopAction, thingsPlan } from './plan.ts';
-import type { Flag, Loop, Proposal, SyncOptions, SyncResult, Vault, VaultResult } from './types.ts';
+import { thingsPlan } from './plan.ts';
+import type { FeedbackItem, Loop, SyncOptions, SyncResult, Vault, VaultResult } from './types.ts';
 
 /**
  * Second pass after syncAll: mirror each root's Interview Loops into job notes (`loop_status`, DERIVED:loop),
- * compute Status proposals, flags, and the Things3 plan, render digests, and stamp `.teal-sync.json`.
+ * queue Teal changes for the coach's `feedback`, plan Things3 to-dos, render digests, and stamp `.teal-sync.json`.
  */
 export function finishAll(result: SyncResult, vaults: Vault[], options: SyncOptions): SyncResult {
   const finished = result.vaults.map((vaultResult) => {
@@ -27,26 +28,27 @@ function finishVault(input: VaultResult, vault: Vault, options: SyncOptions): Va
   const warnings = [...input.warnings];
   const statePath = resolve(vault.dir, vault.config.coachingState);
   const stateFound = existsSync(statePath);
-  if (!stateFound) warnings.push(`No coaching state at ${statePath}; loop mirror and proposals skipped`);
+  if (!stateFound) warnings.push(`No coaching state at ${statePath}; loop mirror skipped`);
   const loops = stateFound ? parseLoops(readFileSync(statePath, 'utf8')) : [];
   const writeLoops = stateFound && !options.dryRun;
 
-  const proposals: Proposal[] = [];
-  const flags: Flag[] = [];
   const jobs = input.jobs.map((job) => {
     const { loop, ambiguous } = findLoop(loops, job.company, job.role);
+    if (ambiguous) warnings.push(`Several loops match ${job.company} (${job.role}); name the role in the loop heading`);
     if (writeLoops) mirrorLoop(vault, job.notePath, loop, options.today, warnings);
-    const updated = stateFound ? { ...job, loopStatus: loop?.status ?? null } : job;
-    const action = loopAction(updated, loop, { today: options.today, dismissed: vault.config.dismissedProposals, ambiguous });
-    if (action.proposal) proposals.push(action.proposal);
-    if (action.flag) flags.push(action.flag);
-    return updated;
+    return stateFound ? { ...job, loopStatus: loop?.status ?? null } : job;
   });
 
+  // Read the queue from disk, not the loaded config: the skill clears it between runs.
+  const configPath = join(vault.dir, '.teal-sync.json');
+  const queued = (JSON.parse(readFileSync(configPath, 'utf8')).pendingFeedback ?? []) as FeedbackItem[];
+  const feedback = mergeFeedback(queued, feedbackItems(input.changes, jobs, options.today));
   if (!options.dryRun) {
-    updateConfigFile(join(vault.dir, '.teal-sync.json'), (raw) => {
+    updateConfigFile(configPath, (raw) => {
       raw.lastSync = options.today;
-      if (stateFound) raw.pendingProposals = proposals;
+      raw.pendingFeedback = feedback;
+      delete raw.pendingProposals;
+      delete raw.dismissedProposals;
     });
   }
 
@@ -54,8 +56,8 @@ function finishVault(input: VaultResult, vault: Vault, options: SyncOptions): Va
     ...input,
     jobs,
     warnings,
-    proposals,
-    flags,
+    feedback,
+    feedbackMessage: feedbackMessage(feedback),
     things: thingsPlan(jobs, vault.config, options.today),
   };
   return { ...partial, digest: vaultDigest(partial), summary: vaultSummary(partial) };

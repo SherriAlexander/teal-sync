@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// Small writes the teal-sync skill makes after the user answers: Things to-do ids, proposal decisions, routing overrides.
+// Small reads and writes for the teal-sync skill and session start: Things to-do ids, the feedback queue, routing overrides.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import YAML from 'yaml';
 import { configPaths, updateConfigFile } from './lib/config.ts';
+import { feedbackMessage } from './lib/feedback.ts';
 import { applyProps, joinNote, splitNote } from './lib/note.ts';
-import type { Proposal } from './lib/types.ts';
+import type { FeedbackItem } from './lib/types.ts';
 
 const USAGE = `Usage:
   node scripts/update.ts things-id --note <main note path> --value <Things uuid | none>
-  node scripts/update.ts resolve-proposal --config <.teal-sync.json> --teal-id <id> [--dismiss]
+  node scripts/update.ts feedback-message --config <.teal-sync.json>
+  node scripts/update.ts clear-feedback --config <.teal-sync.json>
   node scripts/update.ts override --teal-id <id> --route manager|ic [--vaults <vaults.json>]`;
 const DEFAULT_VAULTS = fileURLToPath(new URL('../vaults.json', import.meta.url));
 
@@ -26,7 +28,6 @@ function main(argv: string[]): number {
         value: { type: 'string' },
         config: { type: 'string' },
         'teal-id': { type: 'string' },
-        dismiss: { type: 'boolean', default: false },
         route: { type: 'string' },
         vaults: { type: 'string', default: DEFAULT_VAULTS },
       },
@@ -41,8 +42,15 @@ function main(argv: string[]): number {
       case 'things-id':
         setThingsId(need('note'), need('value'));
         break;
-      case 'resolve-proposal':
-        resolveProposal(need('config'), need('teal-id'), values.dismiss);
+      case 'feedback-message': {
+        const message = feedbackMessage((JSON.parse(readFileSync(need('config'), 'utf8')).pendingFeedback ?? []) as FeedbackItem[]);
+        if (message) console.log(message);
+        break;
+      }
+      case 'clear-feedback':
+        updateConfigFile(need('config'), (raw) => {
+          raw.pendingFeedback = [];
+        });
         break;
       case 'override':
         setOverride(need('vaults'), need('teal-id'), need('route'));
@@ -65,19 +73,6 @@ function setThingsId(notePath: string, value: string): void {
   if (props?.type !== 'job') throw new Error(`${notePath} is not a job note`);
   const { yaml, changed } = applyProps(frontmatter, { things_id: value }, []);
   if (changed) writeFileSync(notePath, joinNote(yaml, body));
-}
-
-function resolveProposal(configPath: string, tealId: string, dismiss: boolean): void {
-  updateConfigFile(configPath, (raw) => {
-    const pending = (raw.pendingProposals ?? []) as Proposal[];
-    const match = pending.find((proposal) => proposal.tealId === tealId);
-    if (!match) throw new Error(`No pending proposal for ${tealId} in ${configPath}`);
-    raw.pendingProposals = pending.filter((proposal) => proposal !== match);
-
-    const dismissed = (raw.dismissedProposals ?? []) as string[];
-    const key = `${tealId}:${match.to}`;
-    raw.dismissedProposals = dismiss && !dismissed.includes(key) ? [...dismissed, key] : dismissed;
-  });
 }
 
 function setOverride(vaultsJson: string, tealId: string, route: string): void {

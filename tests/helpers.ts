@@ -70,8 +70,7 @@ export function makeConfig(route: VaultRoute, over: Partial<VaultConfig> = {}): 
     aliases: {},
     things: { area: 'Example', project: route === 'manager' ? 'Example – M' : 'Example – D' },
     lastSync: null,
-    pendingProposals: [],
-    dismissedProposals: [],
+    pendingFeedback: [],
     ...over,
   };
 }

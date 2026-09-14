@@ -15,9 +15,8 @@ const run = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args], {
 const configPath = (vault: Vault) => join(vault.dir, '.teal-sync.json');
 const readConfig = (vault: Vault) => JSON.parse(readFileSync(configPath(vault), 'utf8'));
 
-const proposal = (tealId: string) => ({
-  tealId, company: 'Acme', role: 'Staff Frontend Engineer', notePath: 'x.md', loop: 'Acme',
-  from: 'Researched', to: 'Applied', tealStatus: 'applied', proposedOn: TODAY,
+const item = (tealId: string, to: string) => ({
+  tealId, company: 'Acme', role: 'Staff Frontend Engineer', url: null, from: 'bookmarked', to, seenOn: TODAY,
 });
 
 describe('update.ts things-id', () => {
@@ -47,26 +46,31 @@ describe('update.ts things-id', () => {
   });
 });
 
-describe('update.ts resolve-proposal', () => {
-  it('removes a handled proposal', () => {
-    const { ic } = makeVaults({ ic: { pendingProposals: [proposal('t1'), proposal('t2')] } });
-    const proc = run(['resolve-proposal', '--config', configPath(ic), '--teal-id', 't1']);
+describe('update.ts feedback queue', () => {
+  it('prints the queued feedback message', () => {
+    const { ic } = makeVaults({ ic: { pendingFeedback: [item('t1', 'applied')] } });
+    const proc = run(['feedback-message', '--config', configPath(ic)]);
     assert.equal(proc.status, 0, proc.stderr);
-    assert.deepEqual(readConfig(ic).pendingProposals.map((p: { tealId: string }) => p.tealId), ['t2']);
-    assert.deepEqual(readConfig(ic).dismissedProposals, []);
+    assert.equal(proc.stdout, "I've just applied to Acme – Staff Frontend Engineer\n");
   });
 
-  it('remembers a dismissed proposal', () => {
-    const { ic } = makeVaults({ ic: { pendingProposals: [proposal('t1')] } });
-    const proc = run(['resolve-proposal', '--config', configPath(ic), '--teal-id', 't1', '--dismiss']);
-    assert.equal(proc.status, 0, proc.stderr);
-    assert.deepEqual(readConfig(ic).pendingProposals, []);
-    assert.deepEqual(readConfig(ic).dismissedProposals, ['t1:Applied']);
-  });
-
-  it('fails on an unknown proposal', () => {
+  it('prints nothing when the queue is empty', () => {
     const { ic } = makeVaults();
-    assert.equal(run(['resolve-proposal', '--config', configPath(ic), '--teal-id', 'nope']).status, 1);
+    const proc = run(['feedback-message', '--config', configPath(ic)]);
+    assert.equal(proc.status, 0, proc.stderr);
+    assert.equal(proc.stdout, '');
+  });
+
+  it('clears the queue and keeps other keys', () => {
+    const { ic } = makeVaults({ ic: { pendingFeedback: [item('t1', 'applied'), item('t2', 'interviewing')] } });
+    const proc = run(['clear-feedback', '--config', configPath(ic)]);
+    assert.equal(proc.status, 0, proc.stderr);
+    assert.deepEqual(readConfig(ic).pendingFeedback, []);
+    assert.equal(readConfig(ic).vaultName, 'ic-web-dev-search');
+  });
+
+  it('requires --config', () => {
+    assert.equal(run(['clear-feedback']).status, 1);
   });
 });
 

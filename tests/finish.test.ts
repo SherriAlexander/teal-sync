@@ -89,47 +89,53 @@ describe('loop mirror', () => {
   });
 });
 
-describe('proposals and config', () => {
-  it('queues proposals in .teal-sync.json and sets lastSync', () => {
+describe('feedback queue and config', () => {
+  it('queues feedback in .teal-sync.json, sets lastSync, and drops the old proposal keys', () => {
     const { manager, ic, all } = makeVaults();
-    writeState(ic, stateWith('### Acme\n- Status: Researched\n'));
-    const result = run(csvOf([row({ id: 't1', statusName: 'applied' })]), all);
+    writeFileSync(join(ic.dir, '.teal-sync.json'), JSON.stringify({ ...readConfig(ic), pendingProposals: [], dismissedProposals: ['t9:Applied'] }));
+    const result = run(csvOf([row({ id: 't1', url: 'https://example.com/jobs/1' })]), all);
 
     const config = readConfig(ic);
     assert.equal(config.lastSync, TODAY);
-    assert.equal(config.pendingProposals.length, 1);
-    assert.equal(config.pendingProposals[0].tealId, 't1');
-    assert.equal(config.pendingProposals[0].from, 'Researched');
-    assert.equal(config.pendingProposals[0].to, 'Applied');
-    assert.deepEqual(vaultOf(result, ic).proposals, config.pendingProposals);
+    assert.deepEqual(config.pendingFeedback, [{
+      tealId: 't1', company: 'Acme', role: 'Staff Frontend Engineer', url: 'https://example.com/jobs/1', from: null, to: 'bookmarked', seenOn: TODAY,
+    }]);
+    assert.ok(!('pendingProposals' in config) && !('dismissedProposals' in config));
     assert.equal(config.things.project, 'Example – D', 'other keys survive');
+    assert.deepEqual(vaultOf(result, ic).feedback, config.pendingFeedback);
+    assert.equal(vaultOf(result, ic).feedbackMessage, "I'm interested in a new job description: Acme – Staff Frontend Engineer (https://example.com/jobs/1)");
 
     assert.equal(readConfig(manager).lastSync, TODAY);
-    assert.deepEqual(readConfig(manager).pendingProposals, []);
+    assert.deepEqual(readConfig(manager).pendingFeedback, []);
+    assert.equal(vaultOf(result, manager).feedbackMessage, null);
   });
 
-  it('drops stale proposals and skips dismissed ones', () => {
-    const { ic, all } = makeVaults({ ic: { dismissedProposals: ['t2:Applied'] } });
-    const csv = csvOf([
-      row({ id: 't1', statusName: 'applied' }),
-      row({ id: 't2', company_name: 'Initech', statusName: 'applied' }),
-    ]);
-    writeState(ic, stateWith('### Acme\n- Status: Researched\n\n### Initech\n- Status: Researched\n'));
-    run(csv, all);
-    assert.deepEqual(readConfig(ic).pendingProposals.map((p: { tealId: string }) => p.tealId), ['t1']);
+  it('keeps queued feedback across syncs and merges moves of the same job', () => {
+    const { ic, all } = makeVaults();
+    run(csvOf([row({ id: 't1', statusName: 'applied' })]), all);
+    writeFileSync(join(ic.dir, '.teal-sync.json'), JSON.stringify({ ...readConfig(ic), pendingFeedback: [] }));
 
-    writeState(ic, stateWith('### Acme\n- Status: Applied\n\n### Initech\n- Status: Researched\n'));
-    run(csv, all);
-    assert.deepEqual(readConfig(ic).pendingProposals, []);
+    run(csvOf([row({ id: 't1', statusName: 'interviewing' })]), all, { today: '2026-09-13' });
+    run(csvOf([row({ id: 't1', statusName: 'negotiating' }), row({ id: 't2', company_name: 'Initech' })]), all, { today: '2026-09-14' });
+    assert.deepEqual(readConfig(ic).pendingFeedback.map((i: { tealId: string; from: string | null; to: string; seenOn: string }) => [i.tealId, i.from, i.to, i.seenOn]), [
+      ['t1', 'applied', 'negotiating', '2026-09-13'],
+      ['t2', null, 'bookmarked', '2026-09-14'],
+    ]);
   });
 
   it('writes nothing on a dry run but still reports', () => {
     const { root, ic, all } = makeVaults();
-    writeState(ic, stateWith('### Acme\n- Status: Researched\n'));
     const before = snapshot(root);
     const result = run(csvOf([row({ id: 't1', statusName: 'applied' })]), all, { dryRun: true });
     assert.deepEqual(snapshot(root), before);
-    assert.equal(vaultOf(result, ic).proposals.length, 1);
+    assert.equal(vaultOf(result, ic).feedback.length, 1);
+  });
+
+  it('warns when several loops match a job', () => {
+    const { ic, all } = makeVaults();
+    writeState(ic, stateWith('### Acme — Design Systems\n- Status: Applied\n\n### Acme — Platform\n- Status: Interviewing\n'));
+    const result = run(csvOf([row({ id: 't1', statusName: 'applied' })]), all);
+    assert.ok(vaultOf(result, ic).warnings.some((w) => /Several loops match Acme/.test(w)), vaultOf(result, ic).warnings.join('\n'));
   });
 
   it('leaves an aborted vault\'s config alone', () => {
@@ -154,38 +160,45 @@ describe('proposals and config', () => {
 });
 
 describe('digest', () => {
-  it('summarizes the fixture and flags an interview with no loop', () => {
+  it('summarizes the fixture with no coach-command suggestions', () => {
     const { manager, ic, all } = makeVaults();
     const result = run(fixtureText(), all);
     assert.equal(result.header, 'Teal sync: 10 jobs (3 manager, 7 IC); 10 new, 0 status changes');
 
-    const globex = vaultOf(result, manager).digest.find((line) => line.includes('Globex'));
-    assert.ok(globex, vaultOf(result, manager).digest.join('\n'));
-    assert.match(globex, /^NEW  Globex .*no loop.*suggest: prep Globex$/);
-    assert.match(vaultOf(result, ic).summary, /^ic-web-dev-search: 7 new/);
+    const digest = vaultOf(result, manager).digest;
+    assert.ok(digest.includes('NEW  Globex (Sr. Manager, Digital Experience) → interviewing'), digest.join('\n'));
+    assert.ok(digest.includes("FEED I've started interviewing for Globex – Sr. Manager, Digital Experience"), digest.join('\n'));
+    assert.ok(!digest.some((line) => /suggest: (?!create|complete)/.test(line)), digest.join('\n'));
+    assert.match(vaultOf(result, ic).summary, /^ic-web-dev-search: 7 new, .*7 for feedback/);
   });
 
-  it('suggests research for bookmarks and a to-do for applied jobs', () => {
+  it('lists feedback for bookmarks and a to-do for applied jobs', () => {
     const { ic, all } = makeVaults();
     const result = run(csvOf([
       row({ id: 't1' }),
       row({ id: 't2', company_name: 'Initech', statusName: 'applied', applied_at: '2026-09-03T07:11:06Z', follow_up_at: '2026-09-14T04:00:00Z' }),
     ]), all);
     const digest = vaultOf(result, ic).digest;
-    assert.ok(digest.some((line) => /^NEW  Acme .*suggest: research Acme$/.test(line)), digest.join('\n'));
+    assert.ok(digest.includes('NEW  Acme (Staff Frontend Engineer) → bookmarked'), digest.join('\n'));
+    assert.ok(digest.includes("FEED I'm interested in a new job description: Acme – Staff Frontend Engineer"), digest.join('\n'));
     assert.ok(digest.some((line) => /^DUE  Initech \(applied 09-03\), check-in 09-14 .*suggest: create Things to-do\?$/.test(line)), digest.join('\n'));
     assert.equal(vaultOf(result, ic).things.create[0].due, '2026-09-14');
   });
 
-  it('reports status moves and proposals on a later sync', () => {
+  it('reports status moves and archiving without flags on a later sync', () => {
     const { ic, all } = makeVaults();
-    run(csvOf([row({ id: 't1' })]), all);
-    writeState(ic, stateWith('### Acme\n- Status: Researched\n'));
-    const result = run(csvOf([row({ id: 't1', statusName: 'applying' })]), all);
+    run(csvOf([row({ id: 't1' }), row({ id: 't2', company_name: 'Initech', statusName: 'interviewing' })]), all);
+    writeState(ic, stateWith('### Acme\n- Status: Interviewing\n\n### Initech\n- Status: Interviewing\n'));
+    const result = run(csvOf([
+      row({ id: 't1', statusName: 'applying' }),
+      row({ id: 't2', company_name: 'Initech', statusName: 'interviewing', archived_at: '2026-09-12T10:00:00Z' }),
+    ]), all);
     const digest = vaultOf(result, ic).digest;
-    assert.equal(result.header, 'Teal sync: 1 job (0 manager, 1 IC); 0 new, 1 status change');
-    assert.ok(digest.some((line) => /^MOVE Acme bookmarked → applying .*suggest: outreach Acme, resume, apply$/.test(line)), digest.join('\n'));
-    assert.ok(digest.some((line) => /^LOOP Acme: Researched → Applied\?/.test(line)), digest.join('\n'));
-    assert.match(vaultOf(result, ic).summary, /1 moved.*1 proposal/);
+    assert.equal(result.header, 'Teal sync: 2 jobs (0 manager, 2 IC); 0 new, 2 status changes');
+    assert.ok(digest.includes('MOVE Acme bookmarked → applying'), digest.join('\n'));
+    assert.ok(digest.includes('GONE Initech (last: interviewing) → archived in Teal'), digest.join('\n'));
+    assert.ok(digest.includes("FEED I'm no longer pursuing Initech – Staff Frontend Engineer (archived in Teal)"), digest.join('\n'));
+    assert.ok(!digest.some((line) => /^(FLAG|LOOP)/.test(line)), digest.join('\n'));
+    assert.match(vaultOf(result, ic).summary, /1 moved, 1 gone, 2 for feedback/);
   });
 });

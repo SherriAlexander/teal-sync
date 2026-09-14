@@ -1,5 +1,6 @@
+import { feedbackSentence } from './feedback.ts';
 import { localDate } from './plan.ts';
-import type { ChangeType, Flag, JobSummary, SyncResult, VaultResult } from './types.ts';
+import type { ChangeType, SyncResult, VaultResult } from './types.ts';
 
 const SUGGEST = '   suggest: ';
 
@@ -18,37 +19,21 @@ export function vaultDigest(vault: VaultResult): string[] {
   if (vault.aborted) return [`ABORT ${vault.vaultName}: ${vault.abortReason}`];
 
   const jobs = new Map(vault.jobs.map((job) => [job.tealId, job]));
-  const flags = new Map(vault.flags.map((flag) => [flag.tealId, flag]));
-  const shownFlags = new Set<string>();
   const lines: string[] = [];
-  const takeFlag = (tealId: string) => {
-    const flag = flags.get(tealId);
-    if (flag) shownFlags.add(tealId);
-    return flag;
-  };
 
   for (const change of vault.changes) {
-    const job = jobs.get(change.tealId);
     switch (change.type) {
       case 'new':
       case 'linked':
-      case 'status': {
-        const flag = takeFlag(change.tealId);
-        const head = change.type === 'status'
-          ? `MOVE ${change.company} ${change.from} → ${change.to}`
-          : `${change.type === 'new' ? 'NEW ' : 'LINK'} ${change.company} (${change.role}) → ${change.to}`;
-        lines.push(flag
-          ? withSuggest(`${head}, ${flagText(flag)}`, flag.suggest)
-          : withSuggest(head, statusSuggestion(change.to ?? '', change.company, job)));
+        lines.push(`${change.type === 'new' ? 'NEW ' : 'LINK'} ${change.company} (${change.role}) → ${change.to}`);
         break;
-      }
+      case 'status':
+        lines.push(`MOVE ${change.company} ${change.from} → ${change.to}`);
+        break;
       case 'archived':
-      case 'missing': {
-        const flag = takeFlag(change.tealId);
-        const suggest = flag?.suggest ?? (job?.loopStatus ? `feedback ${change.company}` : null);
-        lines.push(withSuggest(`GONE ${change.company} (last: ${change.from || 'unknown'}) → ${change.to} in Teal`, suggest));
+      case 'missing':
+        lines.push(`GONE ${change.company} (last: ${change.from || 'unknown'}) → ${change.to} in Teal`);
         break;
-      }
       case 'moved':
         lines.push(`ROUTE ${change.company} (${change.role}) → ${vault.vaultName}`);
         break;
@@ -61,12 +46,8 @@ export function vaultDigest(vault: VaultResult): string[] {
     }
   }
 
-  for (const flag of vault.flags) {
-    if (shownFlags.has(flag.tealId)) continue;
-    lines.push(withSuggest(`FLAG ${flag.company} (${flag.role}): Teal ${flag.tealStatus}, ${flagText(flag)}`, flag.suggest));
-  }
-  for (const proposal of vault.proposals) {
-    lines.push(`LOOP ${proposal.company}: ${proposal.from} → ${proposal.to}? (Teal: ${proposal.tealStatus})`);
+  for (const item of vault.feedback) {
+    lines.push(`FEED ${feedbackSentence(item)}`);
   }
   for (const job of vault.jobs) {
     if (job.route === 'pending') lines.push(`ASK  ${job.company} (${job.role}) → which vault: manager or IC?`);
@@ -94,43 +75,11 @@ export function vaultSummary(vault: VaultResult): string {
     countText(count(['status']), 'moved', 'moved'),
     countText(count(['archived', 'missing']), 'gone', 'gone'),
     countText(count(['moved', 'removed']), 'rerouted', 'rerouted'),
-    countText(vault.proposals.length, 'proposal', 'proposals'),
-    countText(vault.flags.length, 'flag', 'flags'),
+    countText(vault.feedback.length, 'for feedback', 'for feedback'),
     countText(vault.jobs.filter((job) => job.route === 'pending').length, 'to route', 'to route'),
     countText(vault.things.create.length, 'check-in due', 'check-ins due'),
   ].filter(Boolean);
   return `${vault.vaultName}: ${parts.length > 0 ? parts.join(', ') : 'no changes'}`;
-}
-
-function statusSuggestion(status: string, company: string, job: JobSummary | undefined): string | null {
-  const hasLoop = Boolean(job?.loopStatus);
-  switch (status) {
-    case 'bookmarked':
-      return hasLoop ? null : `research ${company}`;
-    case 'applying':
-      return `outreach ${company}, resume, apply`;
-    case 'interviewing':
-      return hasLoop ? null : `prep ${company}`;
-    default:
-      return null;
-  }
-}
-
-function flagText(flag: Flag): string {
-  switch (flag.type) {
-    case 'no-loop':
-      return 'no loop';
-    case 'teal-behind':
-      return `loop says ${flag.loopStatus}; update Teal?`;
-    case 'loop-mismatch':
-      return `loop says ${flag.loopStatus}`;
-    case 'closed-in-teal':
-      return `loop still ${flag.loopStatus}`;
-    case 'unmapped-status':
-      return `unknown Teal status, loop ${flag.loopStatus}`;
-    case 'loop-ambiguous':
-      return 'several loops match; name the role in the loop heading';
-  }
 }
 
 function withSuggest(text: string, suggest: string | null): string {

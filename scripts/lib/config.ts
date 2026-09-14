@@ -54,5 +54,5 @@ function validateConfig(raw: unknown, path: string): VaultConfig {
   if (config.route !== 'manager' && config.route !== 'ic') {
     throw new Error(`${path}: route must be "manager" or "ic"`);
   }
-  return { overrides: {}, aliases: {}, lastSync: null, pendingProposals: [], dismissedProposals: [], ...config } as VaultConfig;
+  return { overrides: {}, aliases: {}, lastSync: null, pendingFeedback: [], ...config } as VaultConfig;
 }

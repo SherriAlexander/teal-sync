@@ -103,6 +103,7 @@ describe('first sync', () => {
       tealStatus: 'applied',
       loopStatus: null,
       notePath: `Jobs/${UMBRELLA}/${UMBRELLA}.md`,
+      url: 'https://example.com/jobs/1006',
       appliedAt: '2026-09-03T07:11:06Z',
       followUpAt: '2026-09-10T04:00:00Z',
       thingsId: null,
@@ -222,6 +223,13 @@ describe('routing edge cases', () => {
     const result = syncAll(editRecords((r) => { r[1].statusName = 'offer'; }), all, { today: TODAY });
     assert.equal(readJob(manager, GLOBEX).fm.teal_status, 'offer');
     assert.ok(result.warnings.some((w) => /offer/.test(w) && /Globex/.test(w)), result.warnings.join('\n'));
+  });
+
+  it('knows negotiating and accepted (no warning)', () => {
+    const { manager, all } = makeVaults();
+    const result = syncAll(editRecords((r) => { r[1].statusName = 'negotiating'; r[2].statusName = 'accepted'; }), all, { today: TODAY });
+    assert.equal(readJob(manager, GLOBEX).fm.teal_status, 'negotiating');
+    assert.deepEqual(result.warnings.filter((w) => /Unknown Teal status/.test(w)), []);
   });
 
   it('puts ambiguous titles in both inboxes with route pending', () => {
